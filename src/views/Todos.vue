@@ -263,13 +263,6 @@ export default {
             this.resetForm();
         },
         deleteTodo(todo) {
-            // const todoURL = dataURL + todo.uid;
-            // axios.delete(todoURL)
-            //     .then(() => {
-            //         this.getTodos();
-            //         this.confirmationMessage = 'Задача удалена из списка';
-            //         this.showConfirmation = true;
-            //     });
             this.todos.forEach(function(elem, index) {
                 if (elem.uid === todo.uid) {
                     this.splice(index, 1);
