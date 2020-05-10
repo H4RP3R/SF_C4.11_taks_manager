@@ -1,8 +1,9 @@
 <template>
 <div class="container">
     <div class="col-sm-10">
-        <h1>Задачи</h1>
-
+        <h1 class="text-center">Задачи</h1>
+        <p id="totl-tasks">Выполнено: {{ completed }} /
+            Не выполнено: {{ notCompleted }}<br><span>(Всего задач: {{ total }})</span></p>
         <!-- Alert messqage -->
         <confirmation :message="message"
             :showConfirmation="showConfirmation"
@@ -40,9 +41,12 @@
                         <div class="btn-group"
                             role="group">
                             <button type="button"
+                                v-b-modal.todo-update-modal
+                                @click="updateTodo(todo)"
                                 class="btn btn-secondary btn-sm">Обновить</button>
                             &nbsp;
                             <button type="button"
+                                @click="deleteTodo(todo)"
                                 class="btn btn-danger btn-sm">X</button>
                         </div>
                     </td>
@@ -53,7 +57,7 @@
 
     </div>
 
-    <!-- Modal Window -->
+    <!-- Modal Window 1 -->
     <b-modal ref="addTodoModal"
         id="todo-modal"
         title="Добавить задачу"
@@ -74,7 +78,7 @@
             <b-form-group id="form-complete-group">
                 <b-form-checkbox-group v-model="addTodoForm.is_completed"
                     id="form-checks">
-                    <b-form-checkbox value="true">Задача выполнена?</b-form-checkbox>
+                    <b-form-checkbox>Задача выполнена?</b-form-checkbox>
                 </b-form-checkbox-group>
             </b-form-group>
             <b-button type="submit"
@@ -83,16 +87,48 @@
                 variant="danger">Сброс</b-button>
         </b-form>
     </b-modal>
-    <!-- Modal Window -->
+    <!-- Modal Window 1 -->
+
+    <!-- Modal Window 2 -->
+    <b-modal ref="updateTodoModal"
+        id="todo-update-modal"
+        title="Update"
+        hide-footer>
+        <b-form @submit="onUpdateSubmit"
+            @reset="onUpdateReset"
+            class="w-100">
+            <b-form-group id="form-update-description-group"
+                label="Описание:"
+                label-for="form-update-description-input">
+                <b-form-input id="form-update-description-input"
+                    type="text"
+                    v-model="updateTodoForm.description"
+                    required>
+                </b-form-input>
+            </b-form-group>
+            <b-form-group id="form-update-complete-group">
+                <b-form-checkbox-group v-model="updateTodoForm.is_completed"
+                    id="form-update-checks">
+                    <b-form-checkbox>Задача выполнена?</b-form-checkbox>
+                </b-form-checkbox-group>
+            </b-form-group>
+            <b-button-group>
+                <b-button type="submit"
+                    variant="primary">Обновить</b-button>
+                <b-button type="reset"
+                    variant="danger">Сброс</b-button>
+            </b-button-group>
+        </b-form>
+    </b-modal>
+    <!-- Modal Window 2 -->
+
 </div>
 </template>
 
 
 <script>
-import axios from 'axios';
 import Confirmation from '@/components/Confirmation.vue';
 
-const dataURL = 'http://localhost:5000/api/tasks/';
 
 export default {
     name: 'Todo',
@@ -103,37 +139,91 @@ export default {
                 description: '',
                 is_completed: [],
             },
+            updateTodoForm: {
+                uid: 0,
+                description: '',
+                is_completed: [],
+            },
             message: '',
             showConfirmation: false,
+            defaultTodos: [{
+                    'description': 'прочитать книгу',
+                    'is_completed': false,
+                    'uid': 0,
+                },
+                {
+                    'description': 'учиться жонглировать 30 минут',
+                    'is_completed': false,
+                    'uid': 1,
+                },
+                {
+                    'description': 'помыть посуду',
+                    'is_completed': false,
+                    'uid': 2,
+                },
+                {
+                    'description': 'поесть',
+                    'is_completed': false,
+                    'uid': 3,
+                },
+            ]
         };
+    },
+    computed: {
+        total: function() {
+            return this.todos.length;
+        },
+        completed: function() {
+            let n = 0;
+            this.todos.forEach(elem => {
+                if (elem.is_completed === true) {
+                    n++
+                }
+            });
+            return n;
+        },
+        notCompleted: function() {
+            let n = 0;
+            this.todos.forEach(elem => {
+                if (elem.is_completed === false) {
+                    n++
+                }
+            });
+            return n;
+        },
     },
     components: {
         confirmation: Confirmation,
     },
     methods: {
         getTodos() {
-            axios.get(dataURL)
-                .then((response) => {
-                    this.todos = response.data.tasks;
-                });
+            if (!localStorage.getItem('todos')) {
+                // use default tasks
+                this.todos = this.defaultTodos;
+                localStorage.setItem('todos', JSON.stringify(this.todos));
+            } else {
+                // use tasks from the local storage if the key exists
+                this.todos = JSON.parse(localStorage.getItem('todos'));
+            }
         },
         resetForm() {
             this.addTodoForm.description = '';
             this.addTodoForm.is_completed = [];
+            this.updateTodoForm.description = '';
+            this.updateTodoForm.is_completed = [];
         },
         onSubmit(event) {
             event.preventDefault();
             this.$refs.addTodoModal.hide();
-            const requestData = {
+            const taskToAdd = {
                 description: this.addTodoForm.description,
-                is_completed: this.addTodoForm.is_completed[0],
-            };
-            axios.post(dataURL, requestData)
-                .then(() => {
-                    this.getTodos();
-                    this.message = `Задача "${requestData.description}" добавлена`;
-                    this.showConfirmation = true;
-                })
+                is_completed: (this.addTodoForm.is_completed.length > 0) ? true : false,
+                uid: this.createUid(),
+            }
+            this.todos.push(taskToAdd)
+            localStorage.setItem('todos', JSON.stringify(this.todos));
+            this.message = `Задача "${taskToAdd.description}" добавлена`;
+            this.showConfirmation = true;
             this.resetForm()
         },
         onReset(event) {
@@ -141,6 +231,71 @@ export default {
             this.$refs.addTodoModal.hide();
             this.resetForm();
         },
+        updateTodo(todo) {
+            // this.updateTodoForm = todo;
+            this.updateTodoForm.description = todo.description;
+            this.updateTodoForm.is_completed = (todo.is_completed) ? [true] : [false];
+            this.updateTodoForm.uid = todo.uid;
+        },
+        onUpdateSubmit(event) {
+            event.preventDefault();
+            this.$refs.updateTodoModal.hide();
+            const taskToUpdate = {
+                description: this.updateTodoForm.description,
+                is_completed: (this.updateTodoForm.is_completed.length > 1) ? true : false,
+                uid: this.updateTodoForm.uid,
+            }
+            // change the task in todos
+            this.todos.forEach(function(elem, index) {
+                if (elem.uid === taskToUpdate.uid) {
+                    this[index] = taskToUpdate;
+                }
+            }, this.todos)
+            localStorage.setItem('todos', JSON.stringify(this.todos));
+            this.getTodos();
+            this.message = `Задача  "ID: ${taskToUpdate.uid}" обновлена`;
+            this.showConfirmation = true;
+
+        },
+        onUpdateReset(event) {
+            event.preventDefault();
+            this.$refs.updateTodoModal.hide();
+            this.resetForm();
+        },
+        deleteTodo(todo) {
+            // const todoURL = dataURL + todo.uid;
+            // axios.delete(todoURL)
+            //     .then(() => {
+            //         this.getTodos();
+            //         this.confirmationMessage = 'Задача удалена из списка';
+            //         this.showConfirmation = true;
+            //     });
+            this.todos.forEach(function(elem, index) {
+                if (elem.uid === todo.uid) {
+                    this.splice(index, 1);
+                }
+            }, this.todos)
+            localStorage.setItem('todos', JSON.stringify(this.todos));
+        },
+        createUid() {
+            if (this.todos.length === 0) {
+                return 0;
+            }
+            const lastId =
+                this.todos.length > 0 ?
+                this.todos[this.todos.length - 1].uid :
+                0;
+            let newUid = lastId + 1;
+            let ids = [] // make an array with existing IDs
+            this.todos.forEach(elem => {
+                ids.push(elem.uid)
+            })
+            // if new ID already exists, increase its value
+            while (ids.includes(newUid)) {
+                newUid += 1;
+            }
+            return newUid;
+        }
     },
     created() {
         this.getTodos();
@@ -152,6 +307,10 @@ export default {
 button#task-add {
     margin-top: 20px;
     margin-bottom: 20px;
+}
+
+#totl-tasks>span {
+    font-style: italic;
 }
 
 h1,
