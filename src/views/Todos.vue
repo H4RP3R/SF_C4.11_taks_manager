@@ -242,7 +242,7 @@ export default {
             this.$refs.updateTodoModal.hide();
             const taskToUpdate = {
                 description: this.updateTodoForm.description,
-                is_completed: (this.updateTodoForm.is_completed.length > 1) ? true : false,
+                is_completed: (this.updateTodoForm.is_completed.includes(true)) ? true : false,
                 uid: this.updateTodoForm.uid,
             }
             // change the task in todos
@@ -291,6 +291,7 @@ export default {
         }
     },
     created() {
+        document.title = 'Todos';
         this.getTodos();
     },
 };
